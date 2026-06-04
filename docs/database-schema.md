@@ -4,7 +4,7 @@ This doc serves as the file for laying out the database schema for this site. Th
 
 ## Purpose
 
-BLUE stores one global graph of canonical guides. A guide is both a readable content object and a node in the learning graph. The graph is used to derive subject views, frontiers, walkthroughs, levels, and reachability.
+BLUE stores one global graph of canonical guides. A guide is a node in the learning graph, and its content lives in its variants (the original write-up plus any methods and alternatives), one of which the guide designates as canonical. The graph is used to derive subject views, frontiers, walkthroughs, levels, and reachability.
 
 The schema deliberately keeps the database source of truth small:
 
@@ -30,53 +30,61 @@ See [Roles and Permissions](#roles-and-permissions) for what each role can do.
 
 ### `guides`
 
+A guide is the graph node. It stores no content of its own, as all content lives in its variants. The guide points to which variant is currently canonical via `canonical_variant_id`.
+
 - `id`: primary key of the guide; the node identity in the graph.
-- `current_revision_id`: primary key of the guide; the node identity in the graph.
+- `canonical_variant_id`: nullable FK to `guide_variants`. Points at the variant currently designated canonical, which is decided from a upvote/downvote system. Null before any variant is published. Creates a guide ↔ variant pointer cycle (guides → variants → guides), so the FK should be deferrable.
 - `slug`: stable URL identifier.
 - `title`: human-readable guide title.
-- `summary`: short description for lists and previews.
+- `knowledge_type`: `theory` (a grand explanation of something we can observe) or `practice` (a route to a specific, well-defined goal). Determines how the guide is structured and what its variants are called: `practice` variants display as **methods**, `theory` variants as **alternatives**.
 - `status`: draft lifecycle state (see enum below).
-- `author_id`: original author profile.
 - `created_at`: row creation time.
 - `updated_at`: last update time.
 - `forked_from_guide_id`: nullable self-reference. When a cross-subject conflict resolves into a **spin-off** (see `overall-system.md`), the guide forks into a subject-specific version. This makes the spin-off an explicit, governed exception to "one canonical guide per topic" instead of looking like an accidental duplicate. In practice, there will be a message/indicator in the guide itself saying something like "forked from {original-guide-title}".
 
 Status enum values are:
 
-- `draft`
-- `in_review`
-- `published`
-- `archived`
-- `rejected`
+- `draft` — no variant has been published yet; `canonical_variant_id` is null.
+- `published` — live; `canonical_variant_id` points at a published variant.
+- `archived` — deliberately retired; `canonical_variant_id` is left untouched so the last canonical content stays retrievable.
 
-### `guide_revisions`
+### `guide_variants`
 
-So, guide revisions can basically be implemented in two ways: via whole guide snapshots (faster but take up slightly more storage, which may or may not be a problem because markdown/text is so tiny anyway; note: images will not be duplicated between revisions) or deltas/diffs (take up less storage but are slower and more complex). See [Snapshots vs. Deltas](#snapshots-vs-deltas) for a comparison between the two methods. 
+Methods, alternatives, and the guide's original write-up all live here as **variants** of the topic. Each variant is its own page with its own URL, revision history, and votes. The guide designates one of them canonical via `guides.canonical_variant_id`. 
 
-The main use cases for `guide_revisions` are for users to be able to see the history of specific guides, how they were changed, and if needed, to roll back to a previous version of the guide easily. Git itself stores snapshots internally for its version history system.
+- `id`: primary key of the variant.
+- `parent_guide_id`: the parent guide this variant lives under.
+- `slug`: stable URL identifier for the variant.
+- `summary`: short description for lists and previews. A guide's list, frontier, and walkthrough preview uses its canonical variant's summary.
+- `current_revision_id`: nullable FK to `guide_variant_revisions`; points at this variant's live `accepted` revision, null before the variant is first published. Creates a variant↔revision pointer cycle, so the FK should be deferrable.
+- `status`: node-level disposition (`draft | published | archived`); same shape as `guides.status`.
+- `author_id`: the variant's original author.
+- `created_at`: row creation time.
+- `updated_at`: last update time.
 
-For BLUE's use case, it seems that snapshots are most likely the better option out of the two methods because they greatly simplify implementation while providing immediate support for rollback, auditing, and attribution. Guides are primarily text-based, which means storage requirements remain relatively small even with many revisions, especially compared to media assets such as images and videos. With snapshots, any revision can be viewed, restored, compared, or synchronized independently without reconstructing it from a long chain of changes. This makes moderation workflows, dispute resolution, and historical review much easier since moderators can inspect exactly what a guide looked like at any point in time. While delta-based storage can reduce storage usage, it introduces complexity around reconstruction, rollback, and maintenance. 
+Ordering among sibling variants under the same parent is **derived** from votes, not stored here.
 
-Later on, as BLUE grows to contain a massive amount of guides, `guide_revisions`'s snapshot system can be optimized for storage through compression (Postgres automatically TOAST-compresses large text, but further optimizations can be made), deduplication (e.g. multiple guides using the same assets), content hashing (generates a unique fingerprint of a revision’s content so identical or duplicate content can be detected and stored only once), and a snapshot + delta hybrid (snapshots as checkpoints with deltas in between each checkpoint).
+### `guide_variant_revisions`
 
-Immutable, append-only version history for guide content. Every edit inserts a new row; rows are never updated or deleted. This is what powers the history view, the change log, diffs between versions, and rollback.
+The single content store: immutable, append-only version history for all variant content (the original write-up plus methods and alternatives). Every edit inserts a new row; revision content is never updated or deleted. This is what powers the history view, the change log, diffs between versions, and rollback. See [Snapshots vs. Deltas](#snapshots-vs-deltas) for a comparison between the two methods behind variant revisions. 
 
 - `id`: primary key of the revision row.
-- `guide_id`: which guide this revision belongs to (many revisions to one guide).
-- `revision_number`: per-guide counter (1, 2, 3, ...), unique with `guide_id`.
+- `variant_id`: which variant this revision belongs to (many revisions to one variant).
+- `revision_number`: per-variant counter (1, 2, 3, ...), unique with `variant_id`.
+- `body`: the full variant content (markdown) as of this revision. Media is referenced by URL, not embedded, so large assets live in object storage rather than in the row.
 - `change_summary`: author's note describing what changed in this revision (like a commit message). Drives the "what changed" entry in the history list.
-- `body`: the full guide content (markdown) as of this revision. Media is referenced by URL, not embedded, so large assets live in object storage rather than in the row.
-- `author_id`: who wrote this specific revision. May differ from `guides.author_id` (the original author), which is how edit credit spreads across contributors.
+- `author_id`: who wrote this specific revision. May differ from the variant's original author, which is how edit credit spreads across contributors.
 - `created_at`: when this revision was written.
 - `status`: draft lifecycle state (see enum below).
 
 Status enum values are:
 
-- `draft`
-- `in_review`
-- `published`
-- `archived` 
-- `rejected`
+- `draft` — being written, not yet submitted.
+- `in_review` — submitted; a verifier panel is judging this revision.
+- `accepted` — passed review. Multiple revisions can be `accepted` over a variant's life; the one currently live is whichever `current_revision_id` points at.
+- `rejected` — this revision attempt was returned by the panel. The author iterates with a new revision; the variant stays `draft` (if never published) or keeps serving its current revision (if already published).
+
+Note `published` is deliberately **not** a revision value. "Published" describes the variant/guide node, while a revision that cleared review is `accepted`. A revision also never becomes `archived`; archiving happens at the variant or guide level.
 
 **Rollback.** Rollback never deletes newer rows. It inserts a new revision that copies an older one's content. Through this, the version history shows that a rollback occurred through the change_summary.
 
@@ -158,51 +166,15 @@ Because walkthrough and level generation use the **longest** path, redundant tra
 
 What over-declaration does cost is **graph bloat**: redundant edges clutter the DAG, walkthroughs, and diffs. A later **transitive reduction** pass can drop any edge `A -> C` when a longer path `A -> ... -> C` already exists. This is a tidiness optimization, not a correctness requirement, since levels stay correct without it. 
 
-### `guide_variants`
-
-Methods and alternatives attached to a canonical parent guide. Each variant is its own page with its own URL and revision history.
-
-- `id`: primary key of the variant.
-- `parent_guide_id`: the canonical guide this variant lives under.
-- `variant_type`: `method` (a competing practice route to the same outcome) or `alternative` (a competing theoretical framing of the same topic).
-- `slug`: stable URL identifier for the variant.
-- `status`: lifecycle state, same enum as `guides.status`.
-- `author_id`: the variant's original author.
-- `created_at`: row creation time.
-- `updated_at`: last update time.
-
-Ordering among sibling variants under the same parent is **derived** from net votes, not stored here.
-
-### `guide_variant_revisions`
-
-Immutable, append-only version history for methods and alternatives. Mirrors `guide_revisions` so variants can cleanly evolve, diff, and roll back independently of the canonical guide.
-
-- `id`: primary key of the revision row.
-- `variant_id`: which variant this revision belongs to.
-- `revision_number`: per-variant counter, unique with `variant_id`.
-- `body`: the full variant content (markdown) as of this revision.
-- `change_summary`: author's note describing what changed.
-- `author_id`: who wrote this specific revision.
-- `created_at`: when this revision was written.
-- `status`: draft lifecycle state (see enum below).
-
-Status enum values are:
-
-- `draft`
-- `in_review`
-- `published`
-- `archived`
-
 ### `votes`
 
-Upvotes and downvotes on guides, methods, and alternatives.
+Upvotes and downvotes on variants (the canonical one plus other methods and alternatives). Because all content lives in variants, a variant is the only votable content unit: voting "on the guide" is voting on its canonical variant.
 
 Key fields:
 
 - `id`: primary key of the vote.
 - `voter_id`: the user who cast the vote.
-- `target_type`: what is being voted on, `guide` or `variant`. Combined with `target_id` this is a polymorphic pointer (no single foreign key).
-- `target_id`: the id of the guide or variant being voted on.
+- `variant_id`: the variant being voted on (FK to `guide_variants`). A real foreign key, not a polymorphic pointer.
 - `direction`: `up` or `down`.
 - `reason`: required only on downvotes. Enum mirroring the canonical downvote rubric exactly: `unclear`, `factually_wrong`, `missing_step`, `outdated`, `broken_link`, `prereq_gap`, `wrong_level`, `scope_creep` (covers material outside topic). 
 - `note`: optional free-form text.
@@ -210,21 +182,21 @@ Key fields:
 
 Constraints:
 
-- One vote per voter per target (`unique (voter_id, target_type, target_id)`).
+- One vote per voter per variant (`unique (voter_id, variant_id)`).
 - A check that `reason` is present if and only if `direction = 'down'`.
 
 Display rules: public users see upvote/downvote totals only. The rubric breakdown is visible to maintainers only, enforced by row level security. Variant ordering among siblings is **derived** from net votes, not stored as a rank column.
 
 ### `review_cases`, `review_panels`, and `review_decisions`
 
-Verifier gates, post-publish re-reviews, disputes, and appeals all share the same shape: an odd-numbered random panel, a majority outcome, and an independent written justification per member. They share one root object (`review_cases`) plus one panel table and one decision table. Type-specific fields hang off the root in **specialized tables** (`guide_review_cases`, `re_review_cases`, `disputes`, `appeals`), each keyed 1:1 on `case_id`. The root carries what every workflow has in common (lifecycle, who opened it, timestamps); the satellite carries only what that one case type needs.
+Verifier gates, post-publish re-reviews, disputes, and appeals all share the same shape: an odd-numbered random panel, a majority outcome, and an independent written justification per member. They share one root object (`review_cases`) plus one panel table and one decision table. Type-specific fields hang off the root in **specialized tables** (`variant_review_cases`, `re_review_cases`, `disputes`, `appeals`), each keyed 1:1 on `case_id`. The root carries what every workflow has in common (lifecycle, who opened it, timestamps); the satellite carries only what that one case type needs.
 
 `review_cases`:
 
 The item being reviewed.
 
 - `id`: primary key of the case.
-- `case_type`: what work the case represents: `guide_publish` | `guide_edit` | `variant_publish` | `dispute` | `appeal` | `re_review`.
+- `case_type`: what work the case represents: `variant_publish` | `variant_edit` | `dispute` | `appeal` | `re_review`. (All content is a variant now, so one publish/edit pair covers the original write-up and every method/alternative.)
 - `status`: lifecycle state: `pending` | `in_review` | `approved` | `rejected`.
 - `created_by`: the user who opened the case (author for publish/edit/appeal, filer for dispute).
 - `created_at`: when the case was created.
@@ -283,18 +255,15 @@ A `reject` decision must have at least one row here; an `approve` has none.
 
 Each attaches type-specific data to a `review_cases` row. `case_id` is both primary key and FK to `review_cases` → one satellite row per case.
 
-`guide_review_cases` (for `guide_publish`, `guide_edit`, `variant_publish`):
+`variant_review_cases` (for `variant_publish`, `variant_edit`):
 
 - `case_id`: PK and FK to `review_cases`.
-- `guide_revision_id`: nullable FK to `guide_revisions`. Set for `guide_publish` / `guide_edit` — the exact guide revision under review.
-- `variant_revision_id`: nullable FK to `guide_variant_revisions`. Set for `variant_publish` — variant content lives in its own revision table, so it cannot reuse `guide_revision_id`.
-
-Either way, the case pins the panel to the exact snapshot it judged, so the decision stays attached to specific content after later edits. Check constraint: exactly one of `guide_revision_id` / `variant_revision_id` is set.
+- `variant_revision_id`: FK to `guide_variant_revisions` — the exact variant revision under review. All content lives in one revision table now, so this is a single FK (no polymorphic split). It pins the panel to the exact snapshot it judged, so the decision stays attached to specific content after later edits.
 
 `re_review_cases`:
 
 - `case_id`: PK and FK to `review_cases`.
-- `guide_id`: the live published guide pulled back for re-review (FK to `guides`). Points at the guide, not a revision, because the trigger is about the live page's accumulated votes.
+- `variant_id`: the live published variant pulled back for re-review (FK to `guide_variants`). Re-review fires on a variant's accumulated votes, so it targets the variant — most often the canonical one, but any published variant (method or alternative) qualifies.
 - `trigger_type`: which post-publish path fired it: `ratio` | `rubric_weighted` | `section_density` (see `overall-system.md` re-review triggers).
 
 `disputes`:
@@ -310,7 +279,7 @@ What each `dispute_type` points at:
 
 | `dispute_type`          | `target_type` | Meaning                                                                            |
 | ----------------------- | ------------- | ---------------------------------------------------------------------------------- |
-| `factual`               | `guide`       | A claim in the content is wrong.                                                   |
+| `factual`               | `variant`     | A claim in a variant's content is wrong — any variant, canonical or not.           |
 | `cross_subject`         | `guide`       | Two subject communities conflict over one guide (may spin off).                    |
 | `maintainer_misconduct` | `profile`     | A verifier/maintainer acted in bad faith, so it points at the user.                |
 | `governance`            | nullable      | A policy/process objection with no single content target; `target_id` may be null. |
@@ -330,7 +299,15 @@ Contests the outcome of a prior `review_case`.
 
 ## Snapshots vs. Deltas
 
-`guide_revisions` and `guide_variant_revisions` store a **full snapshot** of the content per revision. The intended uses are view history, see what changed, and roll back to a previous version, which all work directly off snapshots:
+So, variant revisions can basically be implemented in two ways: via whole snapshots (faster but take up slightly more storage, which may or may not be a problem because markdown/text is so tiny anyway; note: images will not be duplicated between revisions) or deltas/diffs (take up less storage but are slower and more complex). 
+
+The main use cases for `guide_variant_revisions` are for users to be able to see the history of specific variants, how they were changed, and if needed, to roll back to a previous version of the variant easily. Git itself stores snapshots internally for its version history system.
+
+For BLUE's use case, it seems that snapshots are most likely the better option out of the two methods because they greatly simplify implementation while providing immediate support for rollback, auditing, and attribution. Guides are primarily text-based, which means storage requirements remain relatively small even with many revisions, especially compared to media assets such as images and videos. With snapshots, any revision can be viewed, restored, compared, or synchronized independently without reconstructing it from a long chain of changes. This makes moderation workflows, dispute resolution, and historical review much easier since moderators can inspect exactly what a variant looked like at any point in time. While delta-based storage can reduce storage usage, it introduces complexity around reconstruction, rollback, and maintenance. 
+
+Later on, as BLUE grows to contain a massive amount of guides, `guide_variant_revisions`'s snapshot system can be optimized for storage through compression (Postgres automatically TOAST-compresses large text, but further optimizations can be made), deduplication (e.g. multiple guides using the same assets), content hashing (generates a unique fingerprint of a revision’s content so identical or duplicate content can be detected and stored only once), and a snapshot + delta hybrid (snapshots as checkpoints with deltas in between each checkpoint).
+
+`guide_variant_revisions` stores a **full snapshot** of the content per revision. The intended uses are view history, see what changed, and roll back to a previous version, which all work directly off snapshots:
 
 - **History view**: list revisions by `revision_number` with `change_summary`, author, and date.
 - **What changed**: compute a diff between two snapshots at display time (the diff is rendered, not stored).
@@ -381,19 +358,6 @@ Most walkthroughs should be generated on demand by picking a target guide and co
 
 Saved or user-curated walkthroughs are intentionally left for a later migration because their sharing, attribution, and dispute model is still open in `docs/open-questions.md`.
 
-## Row Level Security
-
-All new tables have row level security enabled.
-
-The first-pass policy is intentionally conservative:
-
-- Public users can read `provisional` and `published` guide graph content.
-- Authors can read and edit their own drafts.
-- Authenticated users can create draft guides.
-- Authenticated users can create draft methods or alternatives under public/provisional guides.
-- Guide authors can attach draft prerequisites, subject tags, and TODO prerequisites to their own draft guides.
-- Subject prerequisite floors are publicly readable, but writes are left to service-role/governance code for now.
-
 ## Roles and Permissions
 
 The roles are cumulative: every user is a `learner`, and `maintainer`/`admin` add permissions on top rather than replacing them. 
@@ -441,3 +405,34 @@ Not part of the `overall-system.md` governance spec; an operational role for run
 - Suspend members (`is_suspended`).
 - Service-role and infrastructure configuration, including governance-threshold tuning.
 
+## Not Yet Implemented
+
+These are required by `overall-system.md` but intentionally deferred. They are listed here so the gaps are explicit rather than forgotten. None block the first-pass schema.
+
+### Subject prerequisite floor
+
+`overall-system.md` lets a subject declare a **prerequisite floor** (e.g. "physics floor = arithmetic + algebra") that applies to its tagged subgraph, keeping subject views from spiralling into low-level dependencies. The [Row Level Security](#row-level-security) section already assumes floors are readable, but no table stores them yet.
+
+Planned shape: a join table, e.g.
+
+```text
+subject_prerequisite_floors (
+  subject_id  FK -> subjects,
+  guide_id    FK -> guides,
+  primary key (subject_id, guide_id)
+)
+```
+
+Each row says "this guide is part of subject S's floor." Walkthrough generation scoped to S can then stop descending past floor guides instead of chasing every transitive prerequisite. Writes are governance-only (see the `admin` role).
+
+### Section pointer on votes and re-review
+
+`overall-system.md` lets a downvote optionally carry a **section pointer** (which header of the guide the flag targets), and the **section-density re-review path** fires when a single section accumulates enough flags. The current `votes` table has no section field, so neither the per-section moderator breakdown nor the section-density trigger can be built yet.
+
+Planned shape: a nullable `section_ref` on `votes` holding the header anchor/slug. Sections are parsed from the markdown body at display time, so no separate section table is needed; a null `section_ref` is a whole-guide flag. `re_review_cases` gains a matching nullable `section_ref`, set only when `trigger_type = 'section_density'`, to scope the lighter section-level review.
+
+### Standing / reputation
+
+`overall-system.md` standing-gates dispute filing "to prevent spam," and degrades a maintainer's standing when their decisions are overturned ("persistent patterns remove the verifier role"). Nothing in the schema currently exposes a member's standing.
+
+Open question: **derive** it on demand from existing ground truth (contribution history, `review_decisions`, and `appeals` outcomes) or **store** a maintained `standing`/reputation column on `profiles`. Derivation avoids drift but must be cheap enough to evaluate at dispute-file time and panel-draw time; a stored column is faster to gate on but needs its own update path. Resolve before the dispute system ships.
