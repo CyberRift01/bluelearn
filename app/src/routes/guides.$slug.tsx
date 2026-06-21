@@ -3,11 +3,9 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { useMemo } from "react"
 import {
-  Bookmark,
   ChevronDown,
   ChevronUp,
   Flag,
-  MessageSquare,
   Pencil,
 } from "lucide-react"
 
