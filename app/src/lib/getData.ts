@@ -28,3 +28,8 @@ export const getPathBySlug = (paths: Array<Path>, slug: string) => {
   const foundPath = paths.find(path => path.slug === slug);
   return foundPath;
 }
+
+export const getGuideBySlug = (guides: Array<Guide>, slug: string) => {
+  const foundGuide = guides.find(guide => guide.slug === slug);
+  return foundGuide;
+}

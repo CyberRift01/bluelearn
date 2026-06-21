@@ -1,28 +1,38 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, notFound } from "@tanstack/react-router"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { useMemo } from "react"
 import {
   Bookmark,
-  ExternalLink,
+  ChevronDown,
+  ChevronUp,
   Flag,
   MessageSquare,
+  Pencil,
 } from "lucide-react"
 
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
-import guides from "@/data/guides.json"
-import { extractHeadings } from "@/lib/guideUtils"
+import { extractHeadings, formatDuration } from "@/lib/guideUtils"
 import { CollapsibleSection } from "@/components/CollapsibleSection"
+
+import guides from "@/data/guides.json"
+import { getGuideBySlug } from "@/lib/getData"
 
 export const Route = createFileRoute("/guides/$slug")({
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const headings = useMemo(() => extractHeadings(guides[0].content), [])
+  const { slug } = Route.useParams()
+
+  const guide = getGuideBySlug(guides, slug);
+
+  if (!guide) { throw notFound }
+
+  const headings = useMemo(() => extractHeadings(guide.content), [])
 
   return (
     <div className="mx-auto max-w-[1280px] h-[calc(100vh-70px)] border-x bg-background">
@@ -31,36 +41,10 @@ function RouteComponent() {
 
         {/* SIDEBAR */}
         <aside className="h-[calc(100vh-70px)] overflow-y-auto border-r px-6 py-6">
-
-          {/* Cards */}
-          <div className="mb-6 grid grid-cols-2 gap-3 text-center">
-
-            <div className="rounded-md border p-3 place-content-center">
-              <p className="data-label">
-                Read time
-              </p>
-              <p className="mt-1 data-value">10 min</p>
-            </div>
-
-            <div className="rounded-md border p-3 place-content-center">
-              <p className="data-label">
-                Level
-              </p>
-              <p className="mt-1 data-value">3</p>
-
-              <Button
-                variant="link"
-                className="mt-1 h-auto p-0 text-xs text-brand-blue"
-              >
-                View Graph <ExternalLink className="ml-1 h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
           {/* Prerequisites */}
           <CollapsibleSection title="Prerequisites">
             <ul className="list-disc pl-4">
-              {guides[0].prerequisites.map((item: string) => (
+              {guide.prerequisites.map((item: string) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
@@ -107,12 +91,20 @@ function RouteComponent() {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">
-                <MessageSquare className="h-4 w-4" />
+              <Button variant="default" size="icon">
+                <Pencil className="h-4 w-4" />
+              </Button>
+
+              <Button variant="outline">
+                Open in Graph
               </Button>
 
               <Button variant="ghost" size="icon">
-                <Bookmark className="h-4 w-4" />
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+
+              <Button variant="ghost" size="icon">
+                <ChevronDown className="h-4 w-4" />
               </Button>
 
               <Button variant="ghost" size="icon">
@@ -136,7 +128,7 @@ function RouteComponent() {
             </h1>
 
             <div className="mt-3 mono-micro">
-              {guides[0].author} • {guides[0].created_at}
+              {guides[0].author} | {guides[0].created_at} | {formatDuration(guide.duration)}
             </div>
 
             <div className="mt-4 flex gap-2">
