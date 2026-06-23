@@ -1,0 +1,282 @@
+# Path items for /path-revisions. Referenced from ../openapi.yaml.
+/path-revisions/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+  get:
+    tags: [learning-path-revisions]
+    summary: Get a revision snapshot
+    description: Metadata, included nodes, and the revision's frozen projected edges.
+    operationId: getPathRevision
+    responses:
+      '200':
+        description: The revision snapshot
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                revision:
+                  $ref: '../components/schemas/learning-path-revisions/LearningPathRevision.yaml'
+                nodes:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/learning-path-revisions/PathNode.yaml'
+                edges:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      from_id:
+                        $ref: '../components/schemas/common/Uuid.yaml'
+                      to_id:
+                        $ref: '../components/schemas/common/Uuid.yaml'
+                    required: [from_id, to_id]
+              required: [revision, nodes, edges]
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+  patch:
+    tags: [learning-path-revisions]
+    summary: Overwrite a draft revision's metadata
+    description: Pre-submit only.
+    operationId: updatePathRevision
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/learning-path-revisions/UpdatePathRevisionRequest.yaml'
+    responses:
+      '200':
+        description: The updated revision
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                revision:
+                  $ref: '../components/schemas/learning-path-revisions/LearningPathRevision.yaml'
+              required: [revision]
+      '400':
+        $ref: '../components/responses/_shared.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/_shared.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+
+/path-revisions/{id}/nodes:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+  get:
+    tags: [learning-path-revisions]
+    summary: List the revision's included nodes
+    operationId: listPathNodes
+    responses:
+      '200':
+        description: Included nodes
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nodes:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/learning-path-revisions/PathNode.yaml'
+              required: [nodes]
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+  post:
+    tags: [learning-path-revisions]
+    summary: Re-include a skipped guide as a node
+    operationId: addPathNode
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/learning-path-revisions/AddNodeRequest.yaml'
+    responses:
+      '201':
+        description: The added node
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node:
+                  $ref: '../components/schemas/learning-path-revisions/PathNode.yaml'
+              required: [node]
+      '400':
+        $ref: '../components/responses/_shared.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/_shared.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+
+/path-revisions/{id}/nodes/{baseId}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+    - name: baseId
+      in: path
+      required: true
+      description: The node's guide_base_id.
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+  patch:
+    tags: [learning-path-revisions]
+    summary: Update a node
+    description: Swap the chosen variant, set a note, or toggle is_target.
+    operationId: updatePathNode
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/learning-path-revisions/UpdateNodeRequest.yaml'
+    responses:
+      '200':
+        description: The updated node
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node:
+                  $ref: '../components/schemas/learning-path-revisions/PathNode.yaml'
+              required: [node]
+      '400':
+        $ref: '../components/responses/_shared.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/_shared.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+  delete:
+    tags: [learning-path-revisions]
+    summary: Skip a guide
+    description: Removes the guide from the included set.
+    operationId: removePathNode
+    security:
+      - bearerAuth: []
+    responses:
+      '204':
+        description: Node removed
+      '401':
+        $ref: '../components/responses/_shared.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+
+/path-revisions/{id}/submit:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+  post:
+    tags: [learning-path-revisions]
+    summary: Submit for review
+    description: Flips to submitted and opens a review case.
+    operationId: submitPathRevision
+    security:
+      - bearerAuth: []
+    responses:
+      '201':
+        description: Review case opened
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                review_case_id:
+                  $ref: '../components/schemas/common/Uuid.yaml'
+              required: [review_case_id]
+      '401':
+        $ref: '../components/responses/_shared.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+
+/path-revisions/{id}/rollback:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+  post:
+    tags: [learning-path-revisions]
+    summary: Roll back to an older revision
+    description: Clones an older revision's targets/nodes into a new draft.
+    operationId: rollbackPathRevision
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              revision_id:
+                $ref: '../components/schemas/common/Uuid.yaml'
+            required: [revision_id]
+    responses:
+      '201':
+        description: Created; new draft revision id
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                revision_id:
+                  $ref: '../components/schemas/common/Uuid.yaml'
+              required: [revision_id]
+      '400':
+        $ref: '../components/responses/_shared.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/_shared.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'
+
+/path-revisions/{id}/diff/{otherId}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+    - name: otherId
+      in: path
+      required: true
+      schema:
+        $ref: '../components/schemas/common/Uuid.yaml'
+  get:
+    tags: [learning-path-revisions]
+    summary: Rendered diff between two revision snapshots
+    operationId: diffPathRevisions
+    responses:
+      '200':
+        description: The rendered diff
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/learning-path-revisions/LearningPathRevisionDiff.yaml'
+      '404':
+        $ref: '../components/responses/_shared.yaml#/NotFound'

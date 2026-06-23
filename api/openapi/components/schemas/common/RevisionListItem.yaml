@@ -1,0 +1,18 @@
+type: object
+description: A revision summary for history lists (guide, variant, or path).
+properties:
+  id:
+    $ref: './Uuid.yaml'
+  revision_number:
+    type: integer
+    example: 1
+  status:
+    type: string
+    description: >
+      Draft/submitted is the revision's own status; "approved"/"rejected"
+      shown here is derived from the revision's review case.
+    enum: [draft, submitted, approved, rejected]
+    example: approved
+  created_at:
+    $ref: './Timestamp.yaml'
+required: [id, revision_number, status, created_at]

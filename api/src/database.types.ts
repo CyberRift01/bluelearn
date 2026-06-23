@@ -21,9 +21,9 @@ export type Database = {
           forked_from_guide_base_id: string | null
           id: string
           knowledge_type: Database["public"]["Enums"]["knowledge_type"]
-          slug: string
+          slug: string | null
           status: Database["public"]["Enums"]["node_status"]
-          title: string
+          title: string | null
           updated_at: string
         }
         Insert: {
@@ -32,9 +32,9 @@ export type Database = {
           forked_from_guide_base_id?: string | null
           id?: string
           knowledge_type: Database["public"]["Enums"]["knowledge_type"]
-          slug: string
+          slug?: string | null
           status?: Database["public"]["Enums"]["node_status"]
-          title: string
+          title?: string | null
           updated_at?: string
         }
         Update: {
@@ -43,9 +43,9 @@ export type Database = {
           forked_from_guide_base_id?: string | null
           id?: string
           knowledge_type?: Database["public"]["Enums"]["knowledge_type"]
-          slug?: string
+          slug?: string | null
           status?: Database["public"]["Enums"]["node_status"]
-          title?: string
+          title?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -901,13 +901,22 @@ export type Database = {
       }
     }
     Functions: {
+      compute_walkthrough: { Args: { p_guide_base_id: string }; Returns: Json }
       create_topic: {
         Args: {
           p_body?: string
-          p_knowledge_type: Database["public"]["Enums"]["knowledge_type"]
-          p_slug: string
+          p_knowledge_type?: Database["public"]["Enums"]["knowledge_type"]
           p_summary?: string
-          p_title: string
+          p_title?: string
+        }
+        Returns: string
+      }
+      create_variant: {
+        Args: {
+          p_body?: string
+          p_guide_base_id: string
+          p_summary?: string
+          p_title?: string
         }
         Returns: string
       }

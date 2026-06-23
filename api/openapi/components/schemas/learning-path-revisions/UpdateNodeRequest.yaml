@@ -1,0 +1,12 @@
+type: object
+description: Swap the chosen variant, set a note, or toggle is_target. Partial.
+minProperties: 1
+properties:
+  guide_id:
+    $ref: '../common/Uuid.yaml'
+  is_target:
+    type: boolean
+    example: true
+  note:
+    type: [string, 'null']
+    example: Optional note

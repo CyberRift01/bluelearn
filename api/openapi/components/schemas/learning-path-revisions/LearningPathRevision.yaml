@@ -1,0 +1,13 @@
+type: object
+description: A path revision's editorial metadata.
+properties:
+  id:
+    $ref: '../common/Uuid.yaml'
+  title:
+    type: string
+    example: Backend Engineer
+  summary:
+    type: [string, 'null']
+  status:
+    $ref: '../common/RevisionStatus.yaml'
+required: [id, title, status]

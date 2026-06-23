@@ -1,0 +1,17 @@
+type: object
+description: One included guide in a path revision.
+properties:
+  guide_base_id:
+    $ref: '../common/Uuid.yaml'
+  guide_id:
+    description: The pinned guide variant; content is read live through it.
+    oneOf:
+      - $ref: '../common/Uuid.yaml'
+      - type: 'null'
+  is_target:
+    type: boolean
+    example: true
+  note:
+    type: [string, 'null']
+    example: Optional curator note
+required: [guide_base_id, is_target]
