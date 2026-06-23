@@ -1,4 +1,3 @@
-export * from './topic'
-export * from './subject.ts'
+export * from './subject'
 export * from './guide'
 export * from './identity'

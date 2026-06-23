@@ -33,7 +33,7 @@ export const subjectsRouter = new Hono<HonoEnv>()
     // insert row to subjects
     const {data: insert_data, error: insert_error} = await supabase
       .from('subjects')
-      .insert({slug: slug, name: name, created_by: user.id})
+      .insert({slug: slug, name: name, created_id: user.id})
       .select('id, slug, name')
       .single()
     if (insert_error) {
