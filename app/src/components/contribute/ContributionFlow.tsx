@@ -9,10 +9,12 @@ import { SelectType } from "@/components/contribute/steps/SelectType";
 import { SubjectDetails } from "@/components/contribute/steps/SubjectDetails";
 import { GuideDetails } from "@/components/contribute/steps/GuideDetails";
 import { VariantDetails } from "@/components/contribute/steps/VariantDetails";
-import { PathDetails } from "@/components/contribute/steps/PathDetails";
-import { Submit } from "@/components/contribute/steps/Submit";
 import { Content } from "@/components/contribute/steps/Content";
 import { BaseGuide } from "@/components/contribute/steps/BaseGuide";
+import { PathDetails } from "@/components/contribute/steps/PathDetails";
+import { Submit } from "@/components/contribute/steps/Submit";
+import { SelectPathGuides } from "@/components/contribute/steps/SelectPathGuides";
+import { OrderPathGuides } from "@/components/contribute/steps/OrderPathGuides";
 
 
 export default function ContributionFlow() {
@@ -114,9 +116,10 @@ function Inner({
         <VariantDetails Stepper={Stepper} />
         <PathDetails Stepper={Stepper} />
         
-        <Content Stepper={Stepper} />
-        
         <BaseGuide Stepper={Stepper} />
+        <Content Stepper={Stepper} />
+        <SelectPathGuides Stepper={Stepper} />
+        <OrderPathGuides Stepper={Stepper} />
 
         <Submit Stepper={Stepper} />
       </div>
