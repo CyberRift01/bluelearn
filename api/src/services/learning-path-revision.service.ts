@@ -1,14 +1,14 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { UpdatePathNodeInput, UpdatePathRevisionInput } from '@bluelearn/schemas'
-import type { Database } from '../database.types'
-import { ServiceError } from '../lib/service-error'
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { UpdatePathNodeInput, UpdatePathRevisionInput } from "@bluelearn/schemas"
+import type { Database } from "../database.types"
+import { ServiceError } from "../lib/service-error"
 
 type DB = SupabaseClient<Database>
 
 const REVISION_META =
-  'id, title, summary, change_summary, status, created_at, published_at, updated_at'
+  "id, title, summary, change_summary, status, created_at, published_at, updated_at"
 
-const NODE_COLS = 'guide_base_id, guide_id, is_target, is_included, note'
+const NODE_COLS = "guide_base_id, guide_id, is_target, is_included, note"
 
 // All of a revision's nodes (included or skipped) plus the projected edges (the
 // bridged projection over included nodes) and the raw prerequisite edges among
@@ -16,12 +16,12 @@ const NODE_COLS = 'guide_base_id, guide_id, is_target, is_included, note'
 export async function getRevisionSnapshot(
   supabase: DB,
   revisionId: string,
-  projectedSource: 'frozen' | 'live' = 'frozen',
+  projectedSource: "frozen" | "live" = "frozen",
 ) {
   const { data: nodeRows, error: nodeError } = await supabase
-    .from('learning_path_revision_nodes')
+    .from("learning_path_revision_nodes")
     .select(NODE_COLS)
-    .eq('revision_id', revisionId)
+    .eq("revision_id", revisionId)
 
   if (nodeError) throw new ServiceError(nodeError.message, 500)
 
@@ -30,9 +30,9 @@ export async function getRevisionSnapshot(
 
   if (baseIds.length > 0) {
     const { data: bases, error: baseError } = await supabase
-      .from('guide_bases')
-      .select('id, slug, title')
-      .in('id', baseIds)
+      .from("guide_bases")
+      .select("id, slug, title")
+      .in("id", baseIds)
 
     if (baseError) throw new ServiceError(baseError.message, 500)
     for (const b of bases ?? []) baseMeta.set(b.id, { slug: b.slug, title: b.title })
@@ -49,23 +49,23 @@ export async function getRevisionSnapshot(
   }))
 
   const projectedQuery =
-    projectedSource === 'live'
-      ? supabase.rpc('project_path_edges', { p_revision_id: revisionId })
+    projectedSource === "live"
+      ? supabase.rpc("project_path_edges", { p_revision_id: revisionId })
       : supabase
-        .from('learning_path_revision_edges')
-        .select('from_guide_base_id, to_guide_base_id')
-        .eq('revision_id', revisionId)
+        .from("learning_path_revision_edges")
+        .select("from_guide_base_id, to_guide_base_id")
+        .eq("revision_id", revisionId)
 
   const [projected, raw] = await Promise.all([
     projectedQuery,
     baseIds.length > 0
       ? supabase
-        .from('guide_edges')
-        .select('from_guide_base_id, to_guide_base_id')
-        .eq('edge_type', 'prerequisite')
-        .eq('is_suspended', false)
-        .in('from_guide_base_id', baseIds)
-        .in('to_guide_base_id', baseIds)
+        .from("guide_edges")
+        .select("from_guide_base_id, to_guide_base_id")
+        .eq("edge_type", "prerequisite")
+        .eq("is_suspended", false)
+        .in("from_guide_base_id", baseIds)
+        .in("to_guide_base_id", baseIds)
       : null,
   ])
 
@@ -85,18 +85,18 @@ export async function getRevisionSnapshot(
 
 export async function getLearningPathRevision(supabase: DB, revisionId: string) {
   const { data: revision, error } = await supabase
-    .from('learning_path_revisions')
+    .from("learning_path_revisions")
     .select(REVISION_META)
-    .eq('id', revisionId)
+    .eq("id", revisionId)
     .maybeSingle()
 
   if (error) throw new ServiceError(error.message, 500)
-  if (!revision) throw new ServiceError('Revision not found', 404)
+  if (!revision) throw new ServiceError("Revision not found", 404)
 
   const snapshot = await getRevisionSnapshot(
     supabase,
     revisionId,
-    revision.status === 'published' ? 'frozen' : 'live',
+    revision.status === "published" ? "frozen" : "live",
   )
   return { revision, snapshot }
 }
@@ -108,14 +108,14 @@ export async function updateLearningPathRevision(
   input: UpdatePathRevisionInput,
 ) {
   const { data, error } = await supabase
-    .from('learning_path_revisions')
+    .from("learning_path_revisions")
     .update(input)
-    .eq('id', revisionId)
+    .eq("id", revisionId)
     .select(REVISION_META)
 
   if (error) throw new ServiceError(error.message, 400)
   if (!data || data.length === 0) {
-    throw new ServiceError('Revision not found or not an editable draft', 404)
+    throw new ServiceError("Revision not found or not an editable draft", 404)
   }
   return { revision: data[0] }
 }
@@ -129,22 +129,22 @@ export async function updatePathNode(
   input: UpdatePathNodeInput,
 ) {
   const { data, error } = await supabase
-    .from('learning_path_revision_nodes')
+    .from("learning_path_revision_nodes")
     .update(input)
-    .eq('revision_id', revisionId)
-    .eq('guide_base_id', baseId)
+    .eq("revision_id", revisionId)
+    .eq("guide_base_id", baseId)
     .select(NODE_COLS)
 
   if (error) throw new ServiceError(error.message, 400)
   if (!data || data.length === 0) {
-    throw new ServiceError('Node not found or not editable', 404)
+    throw new ServiceError("Node not found or not editable", 404)
   }
   const node = data[0]
 
   const { data: base, error: baseError } = await supabase
-    .from('guide_bases')
-    .select('slug, title')
-    .eq('id', node.guide_base_id)
+    .from("guide_bases")
+    .select("slug, title")
+    .eq("id", node.guide_base_id)
     .maybeSingle()
 
   if (baseError) throw new ServiceError(baseError.message, 500)
@@ -166,13 +166,13 @@ export async function updatePathNode(
 // the path at it, and freeze the slug on first publish in one transaction via the
 // publish_learning_path_revision RPC. Returns the live slug for routing.
 export async function publishLearningPathRevision(supabase: DB, revisionId: string) {
-  const { data: slug, error } = await supabase.rpc('publish_learning_path_revision', {
+  const { data: slug, error } = await supabase.rpc("publish_learning_path_revision", {
     p_revision_id: revisionId,
   })
 
   if (error) {
-    if (error.code === 'P0002') throw new ServiceError('Revision not found', 404)
-    if (error.code === '42501') throw new ServiceError(error.message, 403)
+    if (error.code === "P0002") throw new ServiceError("Revision not found", 404)
+    if (error.code === "42501") throw new ServiceError(error.message, 403)
     throw new ServiceError(error.message, 400)
   }
   return { slug }
@@ -187,14 +187,14 @@ export async function rollbackLearningPathRevision(
   revisionId: string,
   sourceRevisionId: string,
 ) {
-  const { data: revision_id, error } = await supabase.rpc('rollback_learning_path_revision', {
+  const { data: revision_id, error } = await supabase.rpc("rollback_learning_path_revision", {
     p_revision_id: revisionId,
     p_source_revision_id: sourceRevisionId,
   })
 
   if (error) {
-    if (error.code === 'P0002') throw new ServiceError('Revision not found for this path', 404)
-    if (error.code === '42501') throw new ServiceError(error.message, 403)
+    if (error.code === "P0002") throw new ServiceError("Revision not found for this path", 404)
+    if (error.code === "42501") throw new ServiceError(error.message, 403)
     throw new ServiceError(error.message, 400)
   }
 

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from "zod"
 
 // Create a draft path. The path is built to reach target_ids (at least one
 // goal); title is optional at creation and only required to publish.
@@ -18,7 +18,7 @@ export const updatePathRevisionSchema = z
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
-    message: 'at least one field is required',
+    message: "at least one field is required",
   })
 
 // Edit one node of a draft revision: swap the pinned variant (guide_id), toggle
@@ -33,7 +33,7 @@ export const updatePathNodeSchema = z
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
-    message: 'at least one field is required',
+    message: "at least one field is required",
   })
 
 export type CreateLearningPathInput = z.infer<typeof createLearningPathSchema>

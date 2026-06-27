@@ -1,7 +1,7 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CreateGuideInput, CreateVariantInput } from '@bluelearn/schemas'
-import type { Database } from '../database.types'
-import { ServiceError } from '../lib/service-error'
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { CreateGuideInput, CreateVariantInput } from "@bluelearn/schemas"
+import type { Database } from "../database.types"
+import { ServiceError } from "../lib/service-error"
 
 type DB = SupabaseClient<Database>
 
@@ -48,23 +48,23 @@ const CANONICAL_CONTENT = `
 // missing.
 async function resolveBaseId(supabase: DB, rawSlug: string) {
   const { data, error } = await supabase
-    .from('guide_bases')
-    .select('id')
-    .eq('slug', rawSlug.toLowerCase())
+    .from("guide_bases")
+    .select("id")
+    .eq("slug", rawSlug.toLowerCase())
     .maybeSingle()
 
   if (error) throw new ServiceError(error.message, 500)
-  if (!data) throw new ServiceError('Guide not found', 404)
+  if (!data) throw new ServiceError("Guide not found", 404)
   return data.id
 }
 
 // List published guides, alphabetical. RLS hides drafts from non-authors.
 export async function listPublishedGuides(supabase: DB) {
   const { data, error } = await supabase
-    .from('guide_bases')
+    .from("guide_bases")
     .select(`id, slug, title, knowledge_type, ${CANONICAL_SUMMARY}`)
-    .eq('status', 'published')
-    .order('title')
+    .eq("status", "published")
+    .order("title")
 
   if (error) throw new ServiceError(error.message, 500)
 
@@ -81,7 +81,7 @@ export async function listPublishedGuides(supabase: DB) {
 export async function createGuide(supabase: DB, input: CreateGuideInput) {
   const { title, knowledge_type, summary, body } = input
 
-  const { data: revision_id, error } = await supabase.rpc('create_guide', {
+  const { data: revision_id, error } = await supabase.rpc("create_guide", {
     p_title: title ?? undefined,
     p_knowledge_type: knowledge_type,
     p_summary: summary ?? undefined,
@@ -99,18 +99,18 @@ export async function getGuideBySlug(supabase: DB, rawSlug: string) {
   const slug = rawSlug.toLowerCase()
 
   const { data: guide, error } = await supabase
-    .from('guide_bases')
+    .from("guide_bases")
     .select(`id, slug, title, knowledge_type, status, created_at, updated_at, ${CANONICAL_CONTENT}`)
-    .eq('slug', slug)
+    .eq("slug", slug)
     .maybeSingle()
 
   if (error) throw new ServiceError(error.message, 500)
-  if (!guide) throw new ServiceError('Guide not found', 404)
+  if (!guide) throw new ServiceError("Guide not found", 404)
 
   const { data: tagRows, error: tagError } = await supabase
-    .from('guide_subjects')
-    .select('subjects(id, slug, name)')
-    .eq('guide_base_id', guide.id)
+    .from("guide_subjects")
+    .select("subjects(id, slug, name)")
+    .eq("guide_base_id", guide.id)
 
   if (tagError) throw new ServiceError(tagError.message, 500)
   const subjects = (tagRows ?? []).map((r) => r.subjects).filter((s) => s !== null)
@@ -124,14 +124,14 @@ export async function archiveGuide(supabase: DB, rawSlug: string) {
   const slug = rawSlug.toLowerCase()
 
   const { data, error } = await supabase
-    .from('guide_bases')
-    .update({ status: 'archived' })
-    .eq('slug', slug)
-    .select('id, slug, status')
+    .from("guide_bases")
+    .update({ status: "archived" })
+    .eq("slug", slug)
+    .select("id, slug, status")
 
   if (error) throw new ServiceError(error.message, 500)
   if (!data || data.length === 0) {
-    throw new ServiceError('Guide not found or not permitted', 404)
+    throw new ServiceError("Guide not found or not permitted", 404)
   }
   return data[0]
 }
@@ -141,7 +141,7 @@ export async function archiveGuide(supabase: DB, rawSlug: string) {
 export async function getWalkthrough(supabase: DB, rawSlug: string) {
   const baseId = await resolveBaseId(supabase, rawSlug)
 
-  const { data, error } = await supabase.rpc('compute_walkthrough', {
+  const { data, error } = await supabase.rpc("compute_walkthrough", {
     p_guide_base_id: baseId,
   })
 
@@ -155,13 +155,13 @@ export async function listGuideVariants(supabase: DB, rawSlug: string) {
   const baseId = await resolveBaseId(supabase, rawSlug)
 
   const { data, error } = await supabase
-    .from('guides')
+    .from("guides")
     .select(
       `id, slug, current:guide_revisions!guides_current_revision_id_fkey(title, summary)`,
     )
-    .eq('guide_base_id', baseId)
-    .eq('status', 'published')
-    .order('slug')
+    .eq("guide_base_id", baseId)
+    .eq("status", "published")
+    .order("slug")
 
   if (error) throw new ServiceError(error.message, 500)
 
@@ -182,7 +182,7 @@ export async function addGuideVariant(
 ) {
   const baseId = await resolveBaseId(supabase, rawSlug)
 
-  const { data: revision_id, error } = await supabase.rpc('create_variant', {
+  const { data: revision_id, error } = await supabase.rpc("create_variant", {
     p_guide_base_id: baseId,
     p_title: input.title,
     p_summary: input.summary ?? undefined,
@@ -203,22 +203,22 @@ export async function getVariantBySlug(
   const baseId = await resolveBaseId(supabase, rawSlug)
 
   const { data: variant, error } = await supabase
-    .from('guides')
+    .from("guides")
     .select(
       `id, guide_base_id, slug, status,
        current:guide_revisions!guides_current_revision_id_fkey(id, title, summary, body, created_at)`,
     )
-    .eq('guide_base_id', baseId)
-    .eq('slug', rawVariantSlug.toLowerCase())
+    .eq("guide_base_id", baseId)
+    .eq("slug", rawVariantSlug.toLowerCase())
     .maybeSingle()
 
   if (error) throw new ServiceError(error.message, 500)
-  if (!variant) throw new ServiceError('Variant not found', 404)
+  if (!variant) throw new ServiceError("Variant not found", 404)
 
   const { data: tally, error: tallyError } = await supabase
-    .from('guide_vote_tallies')
-    .select('upvotes, downvotes')
-    .eq('guide_id', variant.id)
+    .from("guide_vote_tallies")
+    .select("upvotes, downvotes")
+    .eq("guide_id", variant.id)
     .maybeSingle()
 
   if (tallyError) throw new ServiceError(tallyError.message, 500)

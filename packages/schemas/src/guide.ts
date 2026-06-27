@@ -1,10 +1,10 @@
-import { z } from 'zod'
+import { z } from "zod"
 
 // A guide starts as an empty draft and is fleshed out in the editor, so
 // every field is optional; knowledge_type defaults to theory.
 export const createGuideSchema = z.object({
   title: z.string().trim().max(200).nullish(),
-  knowledge_type: z.enum(['theory', 'practice']).default('theory'),
+  knowledge_type: z.enum(["theory", "practice"]).default("theory"),
   summary: z.string().trim().max(500).nullish(),
   body: z.string().trim().nullish(),
 })
@@ -20,27 +20,27 @@ export const createVariantSchema = z.object({
 // The downvote rubric, mirrored from the downvote_reason enum. Cited on
 // downvotes only.
 export const downvoteReasons = [
-  'unclear',
-  'factually_wrong',
-  'missing_step',
-  'outdated',
-  'broken_link',
-  'prereq_gap',
-  'wrong_level',
-  'scope_creep',
+  "unclear",
+  "factually_wrong",
+  "missing_step",
+  "outdated",
+  "broken_link",
+  "prereq_gap",
+  "wrong_level",
+  "scope_creep",
 ] as const
 
 // Cast or update the caller's vote on a variant. reason is required iff the
 // direction is down, matching the votes_reason_matches_direction DB constraint.
 export const castVoteSchema = z
   .object({
-    direction: z.enum(['up', 'down']),
+    direction: z.enum(["up", "down"]),
     reason: z.enum(downvoteReasons).nullish(),
     note: z.string().trim().nullish(),
   })
-  .refine((v) => (v.direction === 'down') === (v.reason != null), {
-    message: 'reason is required on a downvote and forbidden otherwise',
-    path: ['reason'],
+  .refine((v) => (v.direction === "down") === (v.reason != null), {
+    message: "reason is required on a downvote and forbidden otherwise",
+    path: ["reason"],
   })
 
 // Roll an older revision forward as a new draft. revision_id is the
@@ -61,7 +61,7 @@ export const updateRevisionSchema = z
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
-    message: 'at least one field is required',
+    message: "at least one field is required",
   })
 
 export type CreateGuideInput = z.infer<typeof createGuideSchema>
