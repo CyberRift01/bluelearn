@@ -104,9 +104,8 @@ the DCO is enough.
   with the `api/` package
 
 ### Fork, clone, install, run
-Fork the repo.
+Fork the repository to your own GitHub account, then run the following commands in your terminal.
 
-Then do the following:
 ```bash
 git clone https://github.com/<your-username>/bluelearn.git
 cd bluelearn
@@ -123,7 +122,7 @@ Copy the example env files and fill in the values the CLI printed:
 
 ```bash
 cp api/.dev.vars.example api/.dev.vars
-cp app/.env.example app/.env       # if app/ uses one
+cp app/.env.example app/.env
 ```
 
 Then in two terminals (or your favourite runner):
