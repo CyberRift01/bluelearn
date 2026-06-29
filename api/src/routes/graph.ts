@@ -1,10 +1,6 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import {
-  createPrerequisiteSchema,
-  deletePrerequisiteSchema,
-  createTodoPrerequisiteSchema,
-} from '@bluelearn/schemas'
 
 type Bindings = {
   SUPABASE: any
@@ -12,10 +8,18 @@ type Bindings = {
 
 export const graph = new Hono<{ Bindings: Bindings }>()
 
-// POST /prerequisites. Create a prerequisite edge
+/**
+ * POST /prerequisites
+ */
 graph.post(
   '/prerequisites',
-  zValidator('json', createPrerequisiteSchema),
+  zValidator(
+    'json',
+    z.object({
+      from_guide_base_id: z.string().uuid(),
+      to_guide_base_id: z.string().uuid(),
+    })
+  ),
   async (c) => {
     const supabase = c.env.SUPABASE
     const { from_guide_base_id, to_guide_base_id } = c.req.valid('json')
@@ -32,34 +36,14 @@ graph.post(
 
     if (error) {
       switch (error.code) {
-
-        // unique_violation (duplicate edge)
-        case '23505': 
-          return c.json(
-            { error: 'Prerequisite already exists' },
-            409
-          )
-
-        // check_violation (self-loop)
-        case '23514': 
-          return c.json(
-            { error: 'A guide cannot be a prerequisite of itself' },
-            422
-          )
-
-        // cycle detection trigger
-        case 'P0001': 
-          return c.json(
-            { error: 'This prerequisite would create a cycle' },
-            409
-          )
-
-        // Any unexpected error
+        case '23505':
+          return c.json({ error: 'Prerequisite already exists' }, 409)
+        case '23514':
+          return c.json({ error: 'Self-loop is not allowed' }, 422)
+        case 'P0001':
+          return c.json({ error: 'This would create a cycle' }, 409)
         default:
-          return c.json(
-            { error: 'Failed to create prerequisite' },
-            500
-          )
+          return c.json({ error: 'Failed to create prerequisite' }, 500)
       }
     }
 
@@ -67,10 +51,17 @@ graph.post(
   }
 )
 
- // DELETE /prerequisites. Suspend a prerequisite edge
+/**
+ * DELETE /prerequisites (soft delete)
+ */
 graph.delete(
   '/prerequisites',
-  zValidator('json', deletePrerequisiteSchema),
+  zValidator(
+    'json',
+    z.object({
+      guide_edge_id: z.string().uuid(),
+    })
+  ),
   async (c) => {
     const supabase = c.env.SUPABASE
     const { guide_edge_id } = c.req.valid('json')
@@ -83,17 +74,16 @@ graph.delete(
       .single()
 
     if (error) {
-      return c.json(
-        { error: 'Failed to suspend prerequisite' },
-        500
-      )
+      return c.json({ error: 'Failed to suspend prerequisite' }, 500)
     }
 
     return c.json(data, 200)
   }
 )
 
- // GET /todos. Get all open prerequisite todos
+/**
+ * GET /todos
+ */
 graph.get('/todos', async (c) => {
   const supabase = c.env.SUPABASE
 
@@ -103,41 +93,45 @@ graph.get('/todos', async (c) => {
     .eq('status', 'open')
 
   if (error) {
-    return c.json(
-      { error: 'Failed to fetch todos' },
-      500
-    )
+    return c.json({ error: 'Failed to fetch todos' }, 500)
   }
 
   return c.json(data, 200)
 })
 
- // POST /todos.
+/**
+ * POST /todos (FIXED)
+ */
 graph.post(
   '/todos',
-  zValidator('json', createTodoPrerequisiteSchema),
+  zValidator(
+    'json',
+    z.object({
+      from_guide_base_id: z.string().uuid(),
+      to_guide_base_id: z.string().uuid().optional(),
+      title: z.string().min(1),
+    })
+  ),
   async (c) => {
     const supabase = c.env.SUPABASE
-    const payload = c.req.valid('json')
+    const { from_guide_base_id, to_guide_base_id, title } =
+      c.req.valid('json')
 
     const { data, error } = await supabase
       .from('todo_prerequisites')
       .insert({
-        ...payload,
+        dependent_guide_base_id: from_guide_base_id,
+        resolved_guide_base_id: to_guide_base_id ?? null,
+        title,
         status: 'open',
       })
       .select()
       .single()
 
     if (error) {
-      return c.json(
-        { error: 'Failed to create todo' },
-        500
-      )
+      return c.json({ error: 'Failed to create todo' }, 500)
     }
 
     return c.json(data, 201)
   }
 )
-
-// Discord Handle: cyberrift1
