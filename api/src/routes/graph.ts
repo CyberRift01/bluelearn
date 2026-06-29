@@ -100,7 +100,7 @@ graph.get('/todos', async (c) => {
 })
 
 /**
- * POST /todos (FIXED)
+ * POST /todos (I FIXED it)
  */
 graph.post(
   '/todos',
