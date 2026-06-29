@@ -6,7 +6,7 @@ type Bindings = {
   SUPABASE: any
 }
 
-export const graph = new Hono<{ Bindings: Bindings }>()
+const graph = new Hono<{ Bindings: Bindings }>()
 
 /**
  * POST /prerequisites
@@ -100,7 +100,7 @@ graph.get('/todos', async (c) => {
 })
 
 /**
- * POST /todos (I FIXED it)
+ * POST /todos
  */
 graph.post(
   '/todos',
@@ -129,9 +129,12 @@ graph.post(
       .single()
 
     if (error) {
-      return c.json({ error: 'Failed to create todo' }, 500)
+      return c.json({ error: 'Failed to create a todo' }, 500)
     }
 
     return c.json(data, 201)
   }
 )
+
+export const prerequisitesRouter = graph
+export const todosRouter = graph
